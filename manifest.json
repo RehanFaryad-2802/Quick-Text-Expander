@@ -1,20 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "DOM Editor Pro",
+  "name": "DOM Editor",
   "version": "1.0",
   "description": "Edit and save DOM element styles persistently",
   "permissions": ["activeTab", "storage", "scripting"],
   "action": {
     "default_popup": "popup.html"
   },
-  "background": {
-    "service_worker": "background.js"
-  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["content.css"]
+      "js": ["content.js"]
     }
   ],
   "icons": {

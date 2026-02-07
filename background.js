@@ -1,12 +1,11 @@
-// Background script for handling messages
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'elementSelected') {
-    // Store the last selected element for popup
-    chrome.storage.local.set({ lastSelectedElement: message.selector });
-  }
-});
-
-// Optional: Handle installation
+// Simple background script
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('DOM Editor Pro installed');
+  console.log('DOM Editor installed');
+  
+  // Set default settings
+  chrome.storage.local.set({
+    theme: 'light',
+    autoApply: false,
+    savedStyles: []
+  });
 });

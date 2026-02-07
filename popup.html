@@ -17,7 +17,10 @@
           </button>
         </div>
       </header>
-
+      <section style="display: flex; align-items: center; padding: 8px;gap: 8px;">
+        <div>Status: </div>
+        <div class="status" id="status">&nbsp;</div>
+      </section>
       <main>
         <div class="section" id="editorSection">
           <div class="form-group">
@@ -31,7 +34,6 @@
               <button id="useCurrent" class="small-btn">Use Current</button>
             </div>
           </div>
-
           <div class="form-group">
             <label for="targetInput">Target Element(s)</label>
             <div class="input-with-btn">
@@ -40,7 +42,7 @@
                 id="targetInput"
                 placeholder=".class, #id, or element"
               />
-              <button id="pickElement" class="small-btn">Pick</button>
+              
             </div>
           </div>
 
@@ -88,12 +90,6 @@
         </div>
       </main>
       <div id="targetGroups"></div>
-      <footer>
-        <button id="toggleEditor" class="toggle-btn">
-          <span class="toggle-icon">▼</span> Toggle Editor Mode
-        </button>
-        <div class="status" id="status"></div>
-      </footer>
     </div>
     <script src="popup.js"></script>
   </body>

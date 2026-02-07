@@ -1,12 +1,9 @@
 class DOMEditor {
   constructor() {
-    this.isPickerMode = false;
     this.initElements();
     this.loadSettings();
     this.loadSavedStyles();
     this.initEventListeners();
-    this.setupPickerListener();
-    this.checkForPickedElement()
   }
 
   initElements() {
@@ -14,17 +11,15 @@ class DOMEditor {
     this.domainInput = document.getElementById('domainInput');
     this.targetInput = document.getElementById('targetInput');
     this.cssInput = document.getElementById('cssInput');
-    this.searchInput = document.createElement('input'); // Will be added dynamically
+    this.searchInput = document.createElement('input');
     
     // Buttons
     this.saveBtn = document.getElementById('saveBtn');
     this.previewBtn = document.getElementById('previewBtn');
     this.clearBtn = document.getElementById('clearBtn');
     this.useCurrentBtn = document.getElementById('useCurrent');
-    this.pickElementBtn = document.getElementById('pickElement');
     this.themeToggle = document.getElementById('themeToggle');
     this.openSettings = document.getElementById('openSettings');
-    this.toggleEditorBtn = document.getElementById('toggleEditor');
     
     // Sections
     this.editorSection = document.getElementById('editorSection');
@@ -34,49 +29,23 @@ class DOMEditor {
     
     // Settings
     this.autoApply = document.getElementById('autoApply');
-    this.highlightOnHover = document.getElementById('highlightOnHover');
-    this.highlightColor = document.getElementById('highlightColor');
     this.exportBtn = document.getElementById('exportBtn');
     this.importBtn = document.getElementById('importBtn');
     this.resetBtn = document.getElementById('resetBtn');
     
     this.status = document.getElementById('status');
     
+    // Remove picker button
+    const pickElementBtn = document.getElementById('pickElement');
+    if (pickElementBtn) pickElementBtn.style.display = 'none';
+    
+    // Remove toggle editor button
+    const toggleEditorBtn = document.getElementById('toggleEditor');
+    if (toggleEditorBtn) toggleEditorBtn.style.display = 'none';
+    
     // Create search input
     this.createSearchBar();
   }
-
-  async restoreFromPicker() {
-  // Check for picked element
-  const { lastSelectedElement } = await chrome.storage.local.get('lastSelectedElement');
-  
-  if (lastSelectedElement) {
-    this.targetInput.value = lastSelectedElement;
-    
-    // Restore any temporarily saved form data
-    const { tempDomain, tempTarget, tempCSS } = await chrome.storage.local.get([
-      'tempDomain', 'tempTarget', 'tempCSS'
-    ]);
-    
-    if (tempDomain && !this.domainInput.value) {
-      this.domainInput.value = tempDomain;
-    }
-    if (tempTarget && !this.targetInput.value) {
-      this.targetInput.value = tempTarget;
-    }
-    if (tempCSS && !this.cssInput.value) {
-      this.cssInput.value = tempCSS;
-    }
-    
-    // Clear temporary storage
-    await chrome.storage.local.remove(['tempDomain', 'tempTarget', 'tempCSS', 'lastSelectedElement']);
-    
-    this.showStatus('Element selected!', 'success');
-  }
-  
-  // Reset picker button state
-  this.resetPickerButton();
-}
 
   createSearchBar() {
     const savedStylesSection = document.querySelector('.section:last-child');
@@ -103,7 +72,7 @@ class DOMEditor {
 
   async loadSettings() {
     const settings = await chrome.storage.local.get([
-      'theme', 'autoApply', 'highlightOnHover', 'highlightColor'
+      'theme', 'autoApply'
     ]);
     
     if (settings.theme === 'dark') {
@@ -112,15 +81,12 @@ class DOMEditor {
     }
     
     this.autoApply.checked = settings.autoApply || false;
-    this.highlightOnHover.checked = settings.highlightOnHover !== false;
-    this.highlightColor.value = settings.highlightColor || '#ff6b6b';
   }
 
   async loadSavedStyles() {
     const { savedStyles = [] } = await chrome.storage.local.get('savedStyles');
-    this.allStyles = savedStyles; // Store all styles for filtering
+    this.allStyles = savedStyles;
     this.renderSavedStyles(savedStyles);
-    // Remove target groups rendering as requested
     this.targetGroups.style.display = 'none';
   }
 
@@ -131,43 +97,18 @@ class DOMEditor {
     // Settings toggle
     this.openSettings.addEventListener('click', () => this.toggleSettings());
     
-    // Editor mode toggle
-    this.toggleEditorBtn.addEventListener('click', () => this.toggleEditorMode());
-    
     // Main buttons
     this.saveBtn.addEventListener('click', () => this.saveStyle());
     this.previewBtn.addEventListener('click', () => this.previewStyle());
     this.clearBtn.addEventListener('click', () => this.clearForm());
     this.useCurrentBtn.addEventListener('click', () => this.useCurrentDomain());
-    this.pickElementBtn.addEventListener('click', () => this.startElementPicker());
     
     // Settings
     this.autoApply.addEventListener('change', () => this.saveSetting('autoApply', this.autoApply.checked));
-    this.highlightOnHover.addEventListener('change', () => this.saveSetting('highlightOnHover', this.highlightOnHover.checked));
-    this.highlightColor.addEventListener('change', () => this.saveSetting('highlightColor', this.highlightColor.value));
     
     this.exportBtn.addEventListener('click', () => this.exportSettings());
     this.importBtn.addEventListener('click', () => this.importSettings());
     this.resetBtn.addEventListener('click', () => this.resetSettings());
-  }
-
-  setupPickerListener() {
-    // Listen for storage changes (when element is picked)
-    chrome.storage.onChanged.addListener((changes, namespace) => {
-      if (namespace === 'local' && changes.lastSelectedElement) {
-        const selector = changes.lastSelectedElement.newValue;
-        this.targetInput.value = selector;
-        this.showStatus('Element selected: ' + selector, 'success');
-        
-        // Re-open popup if it was closed
-        this.reopenPopup();
-      }
-    });
-  }
-
-  reopenPopup() {
-    // Recreate the popup UI (simpler approach)
-    chrome.action.openPopup();
   }
 
   toggleTheme() {
@@ -182,23 +123,6 @@ class DOMEditor {
     this.settingsSection.style.display = isSettingsVisible ? 'none' : 'block';
     this.editorSection.style.display = isSettingsVisible ? 'block' : 'none';
     this.openSettings.textContent = isSettingsVisible ? '⚙️' : '← Back';
-  }
-
-  async toggleEditorMode() {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (!this.canAccessTab(tab)) {
-        this.showStatus('Cannot edit this page (restricted URL)', 'error');
-        return;
-      }
-      
-      await chrome.tabs.sendMessage(tab.id, { action: 'toggleEditor' });
-      this.showStatus('Editor mode toggled', 'success');
-    } catch (error) {
-      console.error('Error toggling editor:', error);
-      this.showStatus('Error: Content script not loaded on this page', 'error');
-    }
   }
 
   async useCurrentDomain() {
@@ -216,98 +140,6 @@ class DOMEditor {
     } catch (error) {
       this.showStatus('Cannot get current URL', 'error');
     }
-  }
-
-  async startElementPicker() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
-    if (!this.canAccessTab(tab)) {
-      this.showStatus('Cannot pick elements on this page', 'error');
-      return;
-    }
-    
-    // Set picker mode
-    this.isPickerMode = true;
-    this.pickElementBtn.textContent = 'Picking...';
-    this.pickElementBtn.disabled = true;
-    this.pickElementBtn.classList.add('picker-mode');
-    
-    // Save current inputs temporarily
-    await chrome.storage.local.set({
-      tempDomain: this.domainInput.value,
-      tempTarget: this.targetInput.value,
-      tempCSS: this.cssInput.value,
-      isPickerActive: true
-    });
-    
-    // Clear last selected element
-    await chrome.storage.local.remove('lastSelectedElement');
-    
-    // Try to send message to content script
-    try {
-      await chrome.tabs.sendMessage(tab.id, { action: 'startPicker' });
-      this.showStatus('Click on any element to select it', 'success');
-      
-      // Set up a listener for when user returns to popup
-      window.addEventListener('focus', this.handlePopupFocus.bind(this));
-      
-    } catch (sendError) {
-      // If content script isn't loaded, inject it
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['content.js']
-      });
-      
-      await chrome.scripting.insertCSS({
-        target: { tabId: tab.id },
-        files: ['content.css']
-      });
-      
-      // Wait for injection
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Try sending message again
-      await chrome.tabs.sendMessage(tab.id, { action: 'startPicker' });
-      this.showStatus('Click on any element to select it', 'success');
-      
-      // Set up focus listener
-      window.addEventListener('focus', this.handlePopupFocus.bind(this));
-    }
-    
-  } catch (error) {
-    console.error('Error starting element picker:', error);
-    this.showStatus('Failed to start element picker', 'error');
-    this.resetPickerButton();
-  }
-}
-handlePopupFocus() {
-  // When popup gets focus again, check for picked element
-  setTimeout(() => {
-    this.restoreFromPicker();
-    window.removeEventListener('focus', this.handlePopupFocus.bind(this));
-  }, 500);
-}
-async checkForPickedElement() {
-  const { lastSelectedElement } = await chrome.storage.local.get('lastSelectedElement');
-  if (lastSelectedElement) {
-    this.targetInput.value = lastSelectedElement;
-    await chrome.storage.local.remove('lastSelectedElement');
-  }
-}
-
-  resetPickerButton() {
-    this.pickElementBtn.textContent = 'Pick';
-    this.pickElementBtn.disabled = false;
-    this.isPickerMode = false;
-    
-    // Restore popup size
-    document.body.style.width = '';
-    document.body.style.height = '';
-    document.querySelector('.container').style.padding = '';
-    document.querySelector('main').style.display = '';
-    document.querySelector('footer').style.display = '';
-    document.querySelector('header h1').textContent = 'DOM Editor';
   }
 
   async saveStyle() {
@@ -372,17 +204,72 @@ async checkForPickedElement() {
         return;
       }
       
-      await chrome.tabs.sendMessage(tab.id, {
-        action: 'previewStyle',
-        target,
-        css
-      });
+      // Try to send message first
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          action: 'previewStyle',
+          target,
+          css
+        });
+        this.showStatus('Preview applied', 'success');
+      } catch (error) {
+        // If content script isn't loaded, apply CSS directly via scripting API
+        await this.injectAndApplyCSS(tab.id, target, css, false);
+        this.showStatus('Preview applied (injected)', 'success');
+      }
       
-      this.showStatus('Preview applied', 'success');
     } catch (error) {
       console.error('Error previewing style:', error);
       this.showStatus('Error applying preview', 'error');
     }
+  }
+
+  async applyStyle(id) {
+    try {
+      const { savedStyles = [] } = await chrome.storage.local.get('savedStyles');
+      const style = savedStyles.find(s => s.id === id);
+      
+      if (!style) return;
+      
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (!this.canAccessTab(tab)) {
+        this.showStatus('Cannot apply on this page', 'error');
+        return;
+      }
+      
+      const currentUrl = new URL(tab.url);
+      
+      if (currentUrl.hostname.includes(style.domain) || tab.url.includes(style.domain)) {
+        // Try to send message first
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            action: 'applyStyle',
+            target: style.target,
+            css: style.css
+          });
+          this.showStatus('Style applied', 'success');
+        } catch (error) {
+          // If content script isn't loaded, apply CSS directly
+          await this.injectAndApplyCSS(tab.id, style.target, style.css, true);
+          this.showStatus('Style applied (injected)', 'success');
+        }
+      } else {
+        this.showStatus(`Domain mismatch. Style is for: ${style.domain}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error applying style:', error);
+      this.showStatus('Error applying style', 'error');
+    }
+  }
+
+  async injectAndApplyCSS(tabId, target, css, persistent) {
+    // Execute script to apply CSS directly
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: applyCSSDirectly,
+      args: [target, css, persistent]
+    });
   }
 
   clearForm() {
@@ -416,38 +303,6 @@ async checkForPickedElement() {
     
     // Scroll to form
     this.editorSection.scrollIntoView({ behavior: 'smooth' });
-  }
-
-  async applyStyle(id) {
-    try {
-      const { savedStyles = [] } = await chrome.storage.local.get('savedStyles');
-      const style = savedStyles.find(s => s.id === id);
-      
-      if (!style) return;
-      
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (!this.canAccessTab(tab)) {
-        this.showStatus('Cannot apply on this page', 'error');
-        return;
-      }
-      
-      const currentUrl = new URL(tab.url);
-      
-      if (currentUrl.hostname.includes(style.domain) || tab.url.includes(style.domain)) {
-        await chrome.tabs.sendMessage(tab.id, {
-          action: 'applyStyle',
-          target: style.target,
-          css: style.css
-        });
-        this.showStatus('Style applied', 'success');
-      } else {
-        this.showStatus(`Domain mismatch. Style is for: ${style.domain}`, 'error');
-      }
-    } catch (error) {
-      console.error('Error applying style:', error);
-      this.showStatus('Error applying style', 'error');
-    }
   }
 
   filterSavedStyles() {
@@ -591,8 +446,6 @@ async checkForPickedElement() {
       await chrome.storage.local.set({
         theme: 'light',
         autoApply: false,
-        highlightOnHover: true,
-        highlightColor: '#ff6b6b',
         savedStyles: []
       });
       
@@ -603,11 +456,11 @@ async checkForPickedElement() {
   }
 
   showStatus(message, type = 'success') {
-    this.status.textContent = message;
+    this.status.textContent = `${message}`;
     this.status.className = `status ${type}`;
     
     setTimeout(() => {
-      this.status.textContent = '';
+      this.status.innerHTML = `&nbsp;`;
       this.status.className = 'status';
     }, 3000);
   }
@@ -626,6 +479,61 @@ async checkForPickedElement() {
     ];
     
     return !blockedPatterns.some(pattern => tab.url.startsWith(pattern));
+  }
+}
+
+// Function to apply CSS directly (injected into page)
+function applyCSSDirectly(selector, css, persistent) {
+  try {
+    if (!selector || !selector.trim()) {
+      console.error("Invalid selector:", selector);
+      return false;
+    }
+
+    // Clean CSS
+    let cssText = css.trim();
+
+    // Create style ID
+    const styleId = persistent
+      ? `dom-editor-persistent-${Date.now()}`
+      : `dom-editor-temp-${Date.now()}`;
+
+    // Remove existing style with same selector
+    const existing = document.getElementById(styleId);
+    if (existing) existing.remove();
+
+    // Create new style
+    const style = document.createElement("style");
+    style.id = styleId;
+
+    // Format CSS properly
+    if (!cssText.includes("{") && !cssText.includes("}")) {
+      // Inline properties
+      if (!cssText.endsWith(";")) {
+        cssText += ";";
+      }
+      style.textContent = `${selector} { ${cssText} }`;
+    } else {
+      // Full CSS rule
+      style.textContent = cssText;
+    }
+
+    document.head.appendChild(style);
+    console.log("CSS applied directly:", { selector, css: cssText });
+
+    // Remove temporary styles after 10 seconds
+    if (!persistent) {
+      setTimeout(() => {
+        if (style.parentNode) {
+          style.remove();
+        }
+      }, 10000);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error applying CSS directly:", error);
+    return false;
   }
 }
 

@@ -90,7 +90,10 @@ header {
   font-weight: 500;
   color: var(--text-primary);
 }
-
+.input-with-btn{
+  display: flex;
+  gap: 8px;
+}
 input[type="text"],
 textarea {
   width: 100%;
@@ -108,10 +111,7 @@ textarea {
   resize: vertical;
 }
 
-.input-with-btn {
-  display: flex;
-  gap: 8px;
-}
+
 
 .small-btn {
   padding: 8px 12px;
@@ -208,20 +208,16 @@ textarea {
 }
 
 .status {
-  margin-top: 12px;
-  padding: 8px;
   border-radius: 4px;
   font-size: 12px;
-  text-align: center;
+  text-align: start;
 }
 
 .status.success {
-  background-color: rgba(46, 204, 113, 0.2);
   color: var(--success);
 }
 
 .status.error {
-  background-color: rgba(231, 76, 60, 0.2);
   color: var(--danger);
 }
 
@@ -363,10 +359,7 @@ textarea {
   margin-bottom: 16px;
 }
 
-/* Picker mode styles */
-.picker-mode {
-  animation: pulse 2s infinite;
-}
+
 
 @keyframes pulse {
   0% { opacity: 1; }
