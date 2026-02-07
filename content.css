@@ -1,0 +1,15 @@
+/* Ensure our injected styles have high specificity */
+.dom-editor-hover {
+  position: relative;
+  z-index: 2147483647 !important; /* Max z-index */
+}
+
+.dom-editor-selected {
+  position: relative;
+  z-index: 2147483647 !important; /* Max z-index */
+}
+
+/* Prevent interference with page styles */
+.dom-editor-style {
+  all: initial !important;
+}

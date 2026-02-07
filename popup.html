@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body class="light">
+    <div class="container">
+      <header>
+        <h1>DOM Editor</h1>
+        <div class="header-controls">
+          <button id="themeToggle" class="icon-btn" title="Toggle theme">
+            <span class="theme-icon">🌙</span>
+          </button>
+          <button id="openSettings" class="icon-btn" title="Settings">
+            ⚙️
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <div class="section" id="editorSection">
+          <div class="form-group">
+            <label for="domainInput">Domain/URL</label>
+            <div class="input-with-btn">
+              <input
+                type="text"
+                id="domainInput"
+                placeholder="example.com or full URL"
+              />
+              <button id="useCurrent" class="small-btn">Use Current</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="targetInput">Target Element(s)</label>
+            <div class="input-with-btn">
+              <input
+                type="text"
+                id="targetInput"
+                placeholder=".class, #id, or element"
+              />
+              <button id="pickElement" class="small-btn">Pick</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="cssInput">CSS</label>
+            <textarea
+              id="cssInput"
+              placeholder="Enter CSS rules here..."
+            ></textarea>
+          </div>
+
+          <div class="button-group">
+            <button id="saveBtn" class="primary-btn">Save Style</button>
+            <button id="previewBtn" class="secondary-btn">Preview</button>
+            <button id="clearBtn" class="danger-btn">Clear</button>
+          </div>
+        </div>
+
+        <div class="section" id="settingsSection" style="display: none">
+          <h3>Settings</h3>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="autoApply" />
+              Auto-apply saved styles on page load
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="highlightOnHover" />
+              Highlight elements on hover
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="highlightColor">Highlight Color</label>
+            <input type="color" id="highlightColor" value="#ff6b6b" />
+          </div>
+          <button id="exportBtn" class="secondary-btn">Export Settings</button>
+          <button id="importBtn" class="secondary-btn">Import Settings</button>
+          <button id="resetBtn" class="danger-btn">Reset All</button>
+        </div>
+
+        <div class="section">
+          <h3>Saved Styles</h3>
+          <div id="savedStyles"></div>
+        </div>
+      </main>
+      <div id="targetGroups"></div>
+      <footer>
+        <button id="toggleEditor" class="toggle-btn">
+          <span class="toggle-icon">▼</span> Toggle Editor Mode
+        </button>
+        <div class="status" id="status"></div>
+      </footer>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
