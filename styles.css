@@ -1,86 +1,100 @@
-.text-expander-suggestion {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  font-size: 13px;
-  color: white;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+/* ===== ULTIMATE FLOATING SUGGESTION ===== */
+.te-floating-suggestion {
+  position: absolute;
   z-index: 2147483647;
+  background: rgba(33, 33, 33, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 100px;
+  padding: 8px 16px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  animation: teSlideUp 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.1);
   pointer-events: none;
-  animation: slideIn 0.2s ease-out;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.1);
+  max-width: 90vw;
 }
 
-@keyframes slideIn {
+@keyframes teSlideUp {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(8px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-.suggestion-icon {
-  font-size: 16px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-}
-
-.suggestion-content {
+.te-suggestion-content {
   display: flex;
   align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   flex-wrap: wrap;
-  gap: 4px;
 }
 
-.suggestion-shortcut {
-  font-weight: bold;
-  background: rgba(255,255,255,0.2);
-  padding: 2px 6px;
-  border-radius: 4px;
+.te-shortcut {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 4px 10px;
+  border-radius: 100px;
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 5px rgba(102, 126, 234, 0.4);
 }
 
-.suggestion-preview {
-  opacity: 0.9;
-  max-width: 200px;
+.te-arrow {
+  color: #a0a0a0;
+  font-size: 16px;
+}
+
+.te-preview {
+  color: #ffffff;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  padding-right: 8px;
 }
 
-.suggestion-hint {
-  opacity: 0.7;
+.te-hint {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 8px;
+  border-radius: 100px;
   font-size: 11px;
-  background: rgba(0,0,0,0.2);
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #ccc;
+  text-transform: uppercase;
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .text-expander-suggestion {
-    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-    border: 1px solid rgba(255,255,255,0.1);
-  }
-}
+/* Dark mode is already handled by the base style */
 
-/* Responsive design */
+/* Mobile optimization */
 @media (max-width: 768px) {
-  .text-expander-suggestion {
-    max-width: 90%;
+  .te-floating-suggestion {
     font-size: 12px;
     padding: 6px 12px;
+    border-radius: 50px;
   }
   
-  .suggestion-preview {
+  .te-preview {
     max-width: 150px;
   }
+  
+  .te-shortcut {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+}
+
+/* For RTL languages */
+[dir="rtl"] .te-suggestion-content {
+  flex-direction: row-reverse;
 }

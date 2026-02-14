@@ -1,334 +1,501 @@
+// ===== ULTIMATE TEXT EXPANDER - FIXED FOR WHATSAPP =====
 let snippets = {};
 let triggerKey = 'Tab';
 let activeSuggestion = null;
-let lastInput = '';
-let lastInputTime = 0;
+let lastSnippetCheck = '';
 
-// Load snippets and settings
-chrome.storage.sync.get(['snippets', 'triggerKey'], function(result) {
-  snippets = result.snippets || {};
-  triggerKey = result.triggerKey || 'Tab';
-});
-
-// Listen for storage changes
-chrome.storage.onChanged.addListener(function(changes) {
-  if (changes.snippets) {
-    snippets = changes.snippets.newValue || {};
-  }
-  if (changes.triggerKey) {
-    triggerKey = changes.triggerKey.newValue || 'Tab';
-  }
-});
-
-// Use multiple event listeners for better compatibility
-document.addEventListener('input', handleInput, true);
-document.addEventListener('keydown', handleKeyDown, true);
-document.addEventListener('keyup', handleKeyUp, true);
-
-function handleInput(e) {
-  const target = e.target;
-  lastInputTime = Date.now();
-  
-  // Check if it's an editable element
-  if (isEditableElement(target)) {
-    setTimeout(() => checkForSnippet(target), 50);
+// Safe way to communicate with background script
+function loadSnippets() {
+  try {
+    // Try to send message to background script
+    chrome.runtime.sendMessage({ action: 'getSnippets' }, function(response) {
+      if (response && response.snippets) {
+        snippets = response.snippets;
+        triggerKey = response.triggerKey || 'Tab';
+        console.log('✅ Text Expander loaded with', Object.keys(snippets).length, 'snippets');
+      }
+    });
+  } catch (e) {
+    console.log('Waiting for extension context...');
+    // Retry after a delay
+    setTimeout(loadSnippets, 500);
   }
 }
 
-function handleKeyDown(e) {
-  // Special handling for different trigger keys
+// Listen for messages from background
+try {
+  chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+    if (request.action === 'snippetsUpdated') {
+      snippets = request.snippets;
+      triggerKey = request.triggerKey || 'Tab';
+    }
+  });
+} catch (e) {
+  // Ignore errors
+}
+
+// Start loading snippets
+setTimeout(loadSnippets, 100);
+
+// ===== UNIVERSAL ELEMENT DETECTION =====
+function findAllEditableElements() {
+  const elements = new Set();
+  
+  // WhatsApp specific selectors
+  const whatsappSelectors = [
+    'div[contenteditable="true"][data-tab="10"]',
+    'div[contenteditable="true"][role="textbox"]',
+    '.copyable-text.selectable-text',
+    'div[spellcheck="true"]',
+    'div[contenteditable="true"]',
+    '[role="textbox"]',
+    'div[aria-placeholder]',
+    'div[aria-multiline="true"]',
+    'div[data-testid="conversation-compose-message-input"]',
+    'div[title*="Type a message"]',
+    'div[aria-label*="Type a message"]',
+    'div[placeholder*="Type a message"]'
+  ];
+  
+  // Try WhatsApp selectors first
+  whatsappSelectors.forEach(selector => {
+    try {
+      document.querySelectorAll(selector).forEach(el => elements.add(el));
+    } catch (e) {}
+  });
+  
+  // Standard input selectors
+  const standardSelectors = [
+    'input[type="text"]',
+    'input[type="search"]',
+    'input[type="email"]',
+    'input[type="url"]',
+    'input[type="tel"]',
+    'input[type="number"]',
+    'input:not([type])',
+    'textarea',
+    '[contenteditable="true"]',
+    '[contenteditable=""]',
+    '[role="textbox"]',
+    '[role="combobox"]',
+    '[role="searchbox"]',
+    '.editable',
+    '.text-input',
+    '.public-DraftEditor-content', // Draft.js (WhatsApp, LinkedIn)
+    '[data-lexical-editor]',
+    '[data-slate-editor]',
+    '[g_editable="true"]', // Gmail
+    'div[aria-multiline="true"]',
+    'div[contenteditable]'
+  ];
+  
+  standardSelectors.forEach(selector => {
+    try {
+      document.querySelectorAll(selector).forEach(el => elements.add(el));
+    } catch (e) {}
+  });
+  
+  // Also check for any element with contenteditable
+  document.querySelectorAll('[contenteditable]').forEach(el => elements.add(el));
+  
+  // Check all elements for editable attributes
+  document.querySelectorAll('*').forEach(el => {
+    if (el.isContentEditable || 
+        el.getAttribute('contenteditable') === 'true' ||
+        el.getAttribute('role') === 'textbox' ||
+        el.getAttribute('role') === 'combobox' ||
+        el.getAttribute('role') === 'searchbox' ||
+        el.classList.contains('editable') ||
+        el.classList.contains('selectable-text')) {
+      elements.add(el);
+    }
+  });
+  
+  return Array.from(elements);
+}
+
+// ===== ATTACH TO EVERYTHING =====
+function attachToAllFields() {
+  const fields = findAllEditableElements();
+  
+  fields.forEach(field => {
+    if (!field.hasAttribute('data-te-attached')) {
+      field.setAttribute('data-te-attached', 'true');
+      
+      // Use capturing phase for better compatibility
+      field.addEventListener('input', handleFieldInput, true);
+      field.addEventListener('keydown', handleFieldKeyDown, true);
+      field.addEventListener('keyup', handleFieldKeyUp, true);
+      field.addEventListener('beforeinput', handleFieldInput, true);
+      
+      // Special for contenteditable
+      if (field.isContentEditable || field.getAttribute('contenteditable')) {
+        // Monitor for changes
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach(() => {
+            checkFieldForSnippet(field);
+          });
+        });
+        
+        observer.observe(field, { 
+          childList: true, 
+          characterData: true, 
+          subtree: true,
+          characterDataOldValue: true
+        });
+      }
+    }
+  });
+}
+
+// ===== HANDLER FUNCTIONS =====
+function handleFieldInput(e) {
+  // Debounce check
+  clearTimeout(field._checkTimeout);
+  field._checkTimeout = setTimeout(() => checkFieldForSnippet(e.target), 50);
+}
+
+function handleFieldKeyUp(e) {
+  // Check on keyup as well
+  clearTimeout(field._checkTimeout);
+  field._checkTimeout = setTimeout(() => checkFieldForSnippet(e.target), 50);
+}
+
+function handleFieldKeyDown(e) {
+  const field = e.target;
+  
+  // Handle trigger key
   if (e.key === triggerKey) {
-    if (activeSuggestion) {
+    // Check if there's an active suggestion for this field
+    if (activeSuggestion && activeSuggestion.field === field) {
       e.preventDefault();
       e.stopPropagation();
-      expandSnippet(activeSuggestion.element, activeSuggestion.shortcut);
+      
+      // Expand the snippet
+      expandSnippet(field, activeSuggestion.shortcut);
       removeSuggestion();
-    } else if (triggerKey === 'Tab') {
-      // Let Tab work normally if no suggestion
-      // But we'll check again after a tiny delay
-      setTimeout(() => {
-        if (activeSuggestion) {
-          expandSnippet(activeSuggestion.element, activeSuggestion.shortcut);
-          removeSuggestion();
-        }
-      }, 10);
+      return false;
     }
-  } else if (e.key === 'Escape' && activeSuggestion) {
-    e.preventDefault();
-    removeSuggestion();
   }
-}
-
-function handleKeyUp(e) {
-  // For sites that might need keyup detection
-  const target = e.target;
-  if (isEditableElement(target) && Date.now() - lastInputTime > 10) {
-    setTimeout(() => checkForSnippet(target), 50);
-  }
-}
-
-function isEditableElement(element) {
-  if (!element) return false;
   
-  // Check various editable states
-  return element.isContentEditable || 
-         element.tagName === 'INPUT' || 
-         element.tagName === 'TEXTAREA' ||
-         element.getAttribute('contenteditable') === 'true' ||
-         element.role === 'textbox' ||
-         element.classList.contains('editable') ||
-         // WhatsApp Web specific
-         element.getAttribute('data-tab') === '10' ||
-         // Gmail compose specific
-         element.getAttribute('g_editable') === 'true' ||
-         element.getAttribute('role') === 'textbox';
+  // Check for backspace/delete to remove suggestion
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    clearTimeout(field._checkTimeout);
+    field._checkTimeout = setTimeout(() => checkFieldForSnippet(field), 100);
+  }
+  
+  // Escape to dismiss
+  if (e.key === 'Escape' && activeSuggestion && activeSuggestion.field === field) {
+    removeSuggestion();
+    e.preventDefault();
+  }
 }
 
-function getElementText(element) {
+// ===== GET TEXT FROM FIELD =====
+function getFieldText(field) {
   try {
-    if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
-      return element.textContent || element.innerText || '';
-    } else if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-      return element.value || '';
-    } else {
-      // Try to get text from various properties
-      return element.textContent || element.innerText || element.value || '';
+    if (!field) return '';
+    
+    // Check if it's a WhatsApp message input
+    if (field.classList.contains('selectable-text') || 
+        field.getAttribute('data-tab') === '10' ||
+        field.closest('[data-testid="conversation-compose-message-input"]')) {
+      
+      // WhatsApp stores text in spans
+      const spans = field.querySelectorAll('span');
+      let text = '';
+      spans.forEach(span => {
+        if (span.textContent && !span.querySelector('img')) {
+          text += span.textContent;
+        }
+      });
+      return text || field.textContent || field.innerText || '';
     }
+    
+    // Standard contenteditable
+    if (field.isContentEditable || field.getAttribute('contenteditable') === 'true') {
+      return field.innerText || field.textContent || '';
+    }
+    
+    // Input/textarea
+    if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
+      return field.value || '';
+    }
+    
+    // Fallback
+    return field.innerText || field.textContent || field.value || '';
   } catch (e) {
     return '';
   }
 }
 
-function setElementText(element, newText) {
+// ===== SET FIELD TEXT =====
+function setFieldText(field, newText) {
   try {
-    if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
-      // For contenteditable elements
-      element.textContent = newText;
+    // Special handling for WhatsApp
+    if (field.classList.contains('selectable-text') || 
+        field.getAttribute('data-tab') === '10' ||
+        field.closest('[data-testid="conversation-compose-message-input"]')) {
       
-      // Trigger appropriate events
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('change', { bubbles: true }));
+      // WhatsApp uses a complex structure - clear and insert text
+      while (field.firstChild) {
+        field.removeChild(field.firstChild);
+      }
+      
+      // Create text nodes for each line
+      const lines = newText.split('\n');
+      lines.forEach((line, index) => {
+        const span = document.createElement('span');
+        span.textContent = line;
+        field.appendChild(span);
+        if (index < lines.length - 1) {
+          field.appendChild(document.createElement('br'));
+        }
+      });
+      
+      // Trigger events
+      field.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      return true;
+    }
+    
+    // Standard contenteditable
+    if (field.isContentEditable || field.getAttribute('contenteditable') === 'true') {
+      field.innerText = newText;
+      
+      field.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
       
       // Move cursor to end
       const range = document.createRange();
       const sel = window.getSelection();
-      range.selectNodeContents(element);
+      range.selectNodeContents(field);
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-    } else if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-      // For input/textarea elements
-      const start = element.selectionStart;
-      element.value = newText;
       
-      // Trigger events
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-      
-      // Move cursor to end
-      element.selectionStart = element.selectionEnd = newText.length;
-    } else {
-      // Fallback for other elements
-      element.textContent = newText;
+      return true;
     }
     
-    return true;
+    // Input/textarea
+    if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
+      field.value = newText;
+      
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      field.selectionStart = field.selectionEnd = newText.length;
+      return true;
+    }
+    
+    return false;
   } catch (e) {
     console.error('Error setting text:', e);
     return false;
   }
 }
 
-function getLastWord(text) {
-  if (!text) return '';
+// ===== CHECK FIELD FOR SNIPPETS =====
+function checkFieldForSnippet(field) {
+  if (!field || Object.keys(snippets).length === 0) return;
   
-  // Get the last word, considering various delimiters
-  const matches = text.match(/(?:^|\s|,|\.|;|:|\?|!)(;[^\s,\.;:?!]+)$/);
-  if (matches) {
-    return matches[1].trim();
+  try {
+    const text = getFieldText(field);
+    if (!text) return;
+    
+    // Look for snippets at the end
+    for (let shortcut in snippets) {
+      // Check if text ends with the shortcut
+      if (text.endsWith(shortcut) || 
+          text.endsWith(' ' + shortcut) || 
+          text.endsWith('\n' + shortcut)) {
+        
+        showModernSuggestion(field, shortcut, snippets[shortcut]);
+        return;
+      }
+      
+      // Also check if it's the last word
+      const words = text.split(/[\s\n]+/);
+      const lastWord = words[words.length - 1];
+      if (lastWord === shortcut) {
+        showModernSuggestion(field, shortcut, snippets[shortcut]);
+        return;
+      }
+    }
+    
+    // If no match found, remove suggestion
+    if (activeSuggestion && activeSuggestion.field === field) {
+      removeSuggestion();
+    }
+  } catch (e) {
+    // Ignore errors
   }
-  
-  // Alternative: just get last word if it starts with ;
-  const words = text.split(/[\s\n\t\r,\.;:?!]+/);
-  const lastWord = words[words.length - 1];
-  return lastWord && lastWord.startsWith(';') ? lastWord : '';
 }
 
-function checkForSnippet(element) {
-  if (!element) return;
-  
-  const text = getElementText(element);
-  const lastWord = getLastWord(text);
-  
-  if (lastWord && snippets[lastWord]) {
-    showSuggestion(element, lastWord, snippets[lastWord]);
-  } else {
-    removeSuggestion();
-  }
-}
-
-function showSuggestion(element, shortcut, snippet) {
+// ===== MODERN SUGGESTION UI =====
+function showModernSuggestion(field, shortcut, snippet) {
+  // Remove any existing suggestion
   removeSuggestion();
   
-  // Create suggestion popup with better UI
+  // Create suggestion element
   const suggestion = document.createElement('div');
-  suggestion.className = 'text-expander-suggestion';
+  suggestion.className = 'te-floating-suggestion';
   
-  // Add icon
-  const icon = document.createElement('span');
-  icon.className = 'suggestion-icon';
-  icon.textContent = '⚡';
+  // Get snippet preview
+  const preview = snippet.replace(/\n/g, ' ↵ ').substring(0, 40);
   
-  // Add content
-  const content = document.createElement('span');
-  content.className = 'suggestion-content';
+  suggestion.innerHTML = `
+    <div class="te-suggestion-content" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px;">
+      <span style="background: #667eea; padding: 4px 10px; border-radius: 100px; font-weight: bold;">${shortcut}</span>
+      <span style="color: #a0a0a0;">→</span>
+      <span style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${preview}${snippet.length > 40 ? '…' : ''}</span>
+      <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 100px; font-size: 11px;">[${triggerKey}]</span>
+    </div>
+  `;
   
-  const shortcutSpan = document.createElement('span');
-  shortcutSpan.className = 'suggestion-shortcut';
-  shortcutSpan.textContent = shortcut;
+  // Style the suggestion
+  Object.assign(suggestion.style, {
+    position: 'absolute',
+    zIndex: '2147483647',
+    background: 'rgba(33, 33, 33, 0.95)',
+    backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    borderRadius: '100px',
+    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: 'white',
+    animation: 'teSlideUp 0.2s ease-out',
+    pointerEvents: 'none'
+  });
   
-  const previewSpan = document.createElement('span');
-  previewSpan.className = 'suggestion-preview';
-  const preview = snippet.replace(/\n/g, '↵ ').substring(0, 40);
-  previewSpan.textContent = ` → ${preview}${snippet.length > 40 ? '…' : ''}`;
+  // Add animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes teSlideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `;
+  document.head.appendChild(style);
   
-  // Add trigger hint
-  const hintSpan = document.createElement('span');
-  hintSpan.className = 'suggestion-hint';
-  hintSpan.textContent = ` [${triggerKey} to expand]`;
-  
-  content.appendChild(shortcutSpan);
-  content.appendChild(previewSpan);
-  content.appendChild(hintSpan);
-  
-  suggestion.appendChild(icon);
-  suggestion.appendChild(content);
-  
-  // Position near the element
-  positionSuggestion(suggestion, element);
+  // Position near the field
+  positionSuggestion(suggestion, field);
   
   document.body.appendChild(suggestion);
   
-  activeSuggestion = {
-    element: element,
-    shortcut: shortcut,
-    div: suggestion
-  };
+  activeSuggestion = { field, shortcut, element: suggestion };
+  
+  // Auto-remove after 2 seconds
+  setTimeout(() => {
+    if (activeSuggestion && activeSuggestion.element === suggestion) {
+      removeSuggestion();
+    }
+  }, 2000);
 }
 
-function positionSuggestion(suggestion, element) {
+function positionSuggestion(suggestion, field) {
   try {
-    const rect = element.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const rect = field.getBoundingClientRect();
     
-    // Default position below the element
-    let top = window.scrollY + rect.bottom + 5;
-    let left = window.scrollX + rect.left;
-    
-    // Adjust if would go off screen
-    const suggestionWidth = 400; // Approximate width
-    const suggestionHeight = 40; // Approximate height
-    
-    if (left + suggestionWidth > viewportWidth) {
-      left = viewportWidth - suggestionWidth - 10;
+    // Try to get cursor position
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const cursorRect = range.getBoundingClientRect();
+      
+      if (cursorRect.width > 0 || cursorRect.height > 0) {
+        suggestion.style.top = (window.scrollY + cursorRect.bottom + 5) + 'px';
+        suggestion.style.left = (window.scrollX + cursorRect.left) + 'px';
+        return;
+      }
     }
     
-    if (top + suggestionHeight > viewportHeight + window.scrollY) {
-      top = window.scrollY + rect.top - suggestionHeight - 5;
-    }
-    
-    suggestion.style.position = 'absolute';
-    suggestion.style.top = top + 'px';
-    suggestion.style.left = left + 'px';
-    suggestion.style.zIndex = '10000';
+    // Fallback to field position
+    suggestion.style.top = (window.scrollY + rect.bottom + 5) + 'px';
+    suggestion.style.left = (window.scrollX + rect.left) + 'px';
   } catch (e) {
-    // Fallback positioning
-    suggestion.style.position = 'fixed';
     suggestion.style.bottom = '20px';
-    suggestion.style.left = '20px';
+    suggestion.style.right = '20px';
+    suggestion.style.position = 'fixed';
   }
 }
 
 function removeSuggestion() {
-  if (activeSuggestion && activeSuggestion.div) {
-    activeSuggestion.div.remove();
+  if (activeSuggestion && activeSuggestion.element) {
+    activeSuggestion.element.remove();
     activeSuggestion = null;
   }
 }
 
-function expandSnippet(element, shortcut) {
-  const snippet = snippets[shortcut];
-  if (!snippet) return false;
-  
-  const currentText = getElementText(element);
-  
-  // Find and replace the shortcut
-  let newText = currentText;
-  const shortcutIndex = currentText.lastIndexOf(shortcut);
-  
-  if (shortcutIndex !== -1) {
-    newText = currentText.substring(0, shortcutIndex) + 
-              snippet + 
-              currentText.substring(shortcutIndex + shortcut.length);
-  } else {
-    // If we can't find exact position, use regex
-    newText = currentText.replace(new RegExp(shortcut + '$'), snippet);
-  }
-  
-  // Set the new text
-  const success = setElementText(element, newText);
-  
-  if (success) {
-    // Flash effect to show expansion happened
-    flashElement(element);
-  }
-  
-  return success;
-}
-
-function flashElement(element) {
-  const originalBg = element.style.backgroundColor;
-  element.style.backgroundColor = '#e6ffe6';
-  element.style.transition = 'background-color 0.3s';
-  
-  setTimeout(() => {
-    element.style.backgroundColor = originalBg;
-  }, 300);
-}
-
-// Special handler for shadow DOM (WhatsApp, etc.)
-function findShadowRoots(element) {
-  if (!element) return [];
-  
-  const roots = [];
-  if (element.shadowRoot) {
-    roots.push(element.shadowRoot);
-  }
-  
-  for (let child of element.children) {
-    roots.push(...findShadowRoots(child));
-  }
-  
-  return roots;
-}
-
-// Watch for dynamically added elements
-const observer = new MutationObserver(function(mutations) {
-  mutations.forEach(function(mutation) {
-    if (mutation.type === 'childList') {
-      mutation.addedNodes.forEach(function(node) {
-        if (node.nodeType === 1) { // Element node
-          if (isEditableElement(node)) {
-            // New editable element found
-          }
-        }
-      });
+// ===== EXPAND SNIPPET =====
+function expandSnippet(field, shortcut) {
+  try {
+    const snippet = snippets[shortcut];
+    if (!snippet) return false;
+    
+    const currentText = getFieldText(field);
+    
+    // Replace the shortcut
+    let newText = currentText;
+    
+    if (currentText.endsWith(shortcut)) {
+      newText = currentText.slice(0, -shortcut.length) + snippet;
+    } else if (currentText.endsWith(' ' + shortcut)) {
+      newText = currentText.slice(0, -(shortcut.length + 1)) + ' ' + snippet;
+    } else if (currentText.endsWith('\n' + shortcut)) {
+      newText = currentText.slice(0, -(shortcut.length + 1)) + '\n' + snippet;
+    } else {
+      // Replace the last occurrence
+      const lastIndex = currentText.lastIndexOf(shortcut);
+      if (lastIndex !== -1) {
+        newText = currentText.substring(0, lastIndex) + snippet + 
+                 currentText.substring(lastIndex + shortcut.length);
+      }
     }
-  });
+    
+    // Set the new text
+    const success = setFieldText(field, newText);
+    
+    if (success) {
+      // Visual feedback
+      field.style.backgroundColor = 'rgba(76, 175, 80, 0.2)';
+      field.style.transition = 'background-color 0.2s';
+      setTimeout(() => {
+        field.style.backgroundColor = '';
+      }, 200);
+      
+      console.log('✅ Expanded:', shortcut);
+    }
+    
+    return success;
+  } catch (e) {
+    console.error('Expansion failed:', e);
+    return false;
+  }
+}
+
+// ===== WATCH FOR DYNAMIC CHANGES =====
+// Aggressive reattachment
+setInterval(attachToAllFields, 1000);
+
+// MutationObserver for new elements
+const observer = new MutationObserver(() => {
+  setTimeout(attachToAllFields, 100);
 });
 
 observer.observe(document.body, {
   childList: true,
   subtree: true
 });
+
+// Initial attachment
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(attachToAllFields, 500);
+  setTimeout(attachToAllFields, 1500);
+  setTimeout(attachToAllFields, 3000);
+});
+
+attachToAllFields();
