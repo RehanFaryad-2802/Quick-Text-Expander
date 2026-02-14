@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+    }
+    .snippet-form {
+      background-color: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    textarea {
+      height: 100px;
+      resize: vertical;
+    }
+    .btn {
+      padding: 10px 20px;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    .btn:hover {
+      background-color: #0052a3;
+    }
+    .btn-danger {
+      background-color: #dc3545;
+    }
+    .btn-danger:hover {
+      background-color: #c82333;
+    }
+    .snippets-list {
+      margin-top: 30px;
+    }
+    .snippet-card {
+      background-color: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .snippet-shortcut {
+      font-weight: bold;
+      color: #0066cc;
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    .snippet-text {
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .snippet-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .trigger-settings {
+      background-color: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Quick Text Expander Settings</h1>
+  
+  <div class="trigger-settings">
+    <h3>Trigger Key</h3>
+    <div class="form-group">
+      <label for="triggerKey">Select trigger key:</label>
+      <select id="triggerKey">
+        <option value="Tab">Tab</option>
+        <option value="Enter">Enter</option>
+        <option value="Space">Space</option>
+      </select>
+    </div>
+    <p style="color: #666; font-size: 12px;">Press this key after typing a shortcut to expand it</p>
+  </div>
+  
+  <div class="snippet-form">
+    <h3>Add New Snippet</h3>
+    <div class="form-group">
+      <label for="shortcut">Shortcut (must start with ;)</label>
+      <input type="text" id="shortcut" placeholder=";email" value=";">
+    </div>
+    <div class="form-group">
+      <label for="snippetText">Expanded Text</label>
+      <textarea id="snippetText" placeholder="your.email@example.com"></textarea>
+    </div>
+    <button class="btn" id="saveSnippet">Save Snippet</button>
+  </div>
+  
+  <div class="snippets-list">
+    <h3>Your Snippets</h3>
+    <div id="snippetsContainer"></div>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>
