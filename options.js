@@ -24,6 +24,7 @@ function loadSettings() {
 function saveTriggerKey() {
   const triggerKey = document.getElementById('triggerKey').value;
   chrome.storage.sync.set({ triggerKey: triggerKey });
+  showToast('Trigger key updated! ⚡');
 }
 
 function saveSnippet() {
@@ -35,11 +36,6 @@ function saveSnippet() {
     return;
   }
   
-  if (!shortcut.startsWith(';')) {
-    alert('Shortcut must start with ;');
-    return;
-  }
-  
   chrome.storage.sync.get(['snippets'], function(result) {
     const snippets = result.snippets || {};
     snippets[shortcut] = text;
@@ -48,6 +44,7 @@ function saveSnippet() {
       document.getElementById('shortcut').value = ';';
       document.getElementById('snippetText').value = '';
       loadSnippets();
+      showToast('Snippet saved! 🌙');
     });
   });
 }
@@ -56,29 +53,39 @@ function displaySnippets(snippets) {
   const container = document.getElementById('snippetsList');
   
   if (Object.keys(snippets).length === 0) {
-    container.innerHTML = '<p>No snippets yet. Add one above!</p>';
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🌙</div>
+        <div class="empty-state-title">No snippets yet</div>
+        <div class="empty-state-text">Create your first snippet above to get started!</div>
+      </div>
+    `;
     return;
   }
   
-  let html = '';
+  let html = '<div class="snippets-grid">';
   for (const [shortcut, text] of Object.entries(snippets)) {
     html += `
-      <div class="snippet-card" data-shortcut="${shortcut}">
+      <div class="snippet-item" data-shortcut="${shortcut}">
         <div class="snippet-shortcut">${shortcut}</div>
         <div class="snippet-text">${text}</div>
         <div class="snippet-actions">
-          <button class="delete">Delete</button>
+          <button class="btn btn-delete delete">
+            <span>🗑️</span>
+            Delete
+          </button>
         </div>
       </div>
     `;
   }
+  html += '</div>';
   
   container.innerHTML = html;
   
   // Add delete listeners
   document.querySelectorAll('.delete').forEach(btn => {
     btn.addEventListener('click', function() {
-      const card = this.closest('.snippet-card');
+      const card = this.closest('.snippet-item');
       const shortcut = card.dataset.shortcut;
       deleteSnippet(shortcut);
     });
@@ -92,7 +99,35 @@ function deleteSnippet(shortcut) {
       delete snippets[shortcut];
       chrome.storage.sync.set({ snippets: snippets }, function() {
         loadSnippets();
+        showToast('Snippet deleted 🗑️');
       });
     });
   }
+}
+
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #818cf8, #c084fc);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 40px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(129, 140, 248, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
 }

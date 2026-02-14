@@ -3,56 +3,277 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body {
-      width: 300px;
-      padding: 15px;
-      font-family: Arial, sans-serif;
+    * {
       margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    h3 {
-      margin: 0 0 10px 0;
-      color: #333;
+
+    body {
+      width: 340px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(165deg, #0a0c0f 0%, #14181c 100%);
+      margin: 0;
+      color: #e2e8f0;
     }
-    .snippet {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
+
+    .container {
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
     }
-    .shortcut {
-      font-weight: bold;
-      color: #0066cc;
+
+    .container::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
     }
-    .preview {
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+    }
+
+    .header h3 {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0;
+      letter-spacing: -0.3px;
+    }
+
+    .badge {
+      background: rgba(129, 140, 248, 0.15);
+      color: #818cf8;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      border: 1px solid rgba(129, 140, 248, 0.3);
+      backdrop-filter: blur(5px);
+    }
+
+    .snippets-container {
+      max-height: 350px;
+      overflow-y: auto;
+      margin-bottom: 15px;
+      scrollbar-width: thin;
+      scrollbar-color: #2d3748 #1a202c;
+    }
+
+    .snippets-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .snippets-container::-webkit-scrollbar-track {
+      background: #1a202c;
+      border-radius: 10px;
+    }
+
+    .snippets-container::-webkit-scrollbar-thumb {
+      background: #2d3748;
+      border-radius: 10px;
+    }
+
+    .snippets-container::-webkit-scrollbar-thumb:hover {
+      background: #4a5568;
+    }
+
+    .snippet-card {
+      background: rgba(26, 32, 44, 0.8);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .snippet-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #818cf8, #c084fc, #818cf8);
+      background-size: 200% 100%;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      animation: gradientShift 2s ease infinite;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .snippet-card:hover {
+      border-color: rgba(129, 140, 248, 0.3);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(129, 140, 248, 0.2);
+    }
+
+    .snippet-card:hover::before {
+      opacity: 1;
+    }
+
+    .shortcut-badge {
+      display: inline-block;
+      background: rgba(129, 140, 248, 0.1);
+      color: #818cf8;
+      padding: 6px 12px;
+      border-radius: 30px;
+      font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      border: 1px solid rgba(129, 140, 248, 0.2);
+      letter-spacing: 0.3px;
+      text-shadow: 0 0 10px rgba(129, 140, 248, 0.3);
+    }
+
+    .shortcut-badge::before {
+      content: '⚡';
+      margin-right: 5px;
       font-size: 12px;
-      color: #666;
+      filter: drop-shadow(0 0 5px #818cf8);
+    }
+
+    .preview-text {
+      font-size: 13px;
+      color: #a0aec0;
+      line-height: 1.5;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px 12px;
+      border-radius: 12px;
+      border-left: 3px solid #818cf8;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      margin: 0;
+      border: 1px solid rgba(255, 255, 255, 0.03);
     }
-    .btn {
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      background: rgba(26, 32, 44, 0.5);
+      backdrop-filter: blur(10px);
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+      opacity: 0.7;
+      filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.3));
+    }
+
+    .empty-state-text {
+      color: #818cf8;
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .empty-state-hint {
+      color: #718096;
+      font-size: 13px;
+    }
+
+    .btn-primary {
       width: 100%;
-      padding: 8px;
-      margin-top: 10px;
-      background: #0066cc;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 40px;
+      font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(129, 140, 248, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      letter-spacing: 0.3px;
+      position: relative;
+      overflow: hidden;
     }
-    .btn:hover {
-      background: #0052a3;
+
+    .btn-primary::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transform: rotate(45deg);
+      animation: shimmer 3s infinite;
     }
-    .empty {
-      color: #666;
-      font-style: italic;
-      padding: 10px;
+
+
+    .btn-primary:hover {
+      box-shadow: 0 8px 25px rgba(129, 140, 248, 0.5);
+    }
+
+    .btn-primary:active {
+    }
+
+    .btn-icon {
+      font-size: 18px;
+      filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+    }
+
+    .footer {
+      margin-top: 15px;
+      font-size: 11px;
+      color: #4a5568;
       text-align: center;
+      letter-spacing: 0.3px;
     }
   </style>
 </head>
 <body>
-  <h3>Quick Text Expander</h3>
-  <div id="snippets"></div>
-  <button class="btn" id="options">Settings</button>
+  <div class="container">
+    <div class="header">
+      <h3>⚡ Quick Text Expander</h3>
+      <span class="badge">DARK EDITION</span>
+    </div>
+    
+    <div id="snippets" class="snippets-container"></div>
+    
+    <button class="btn-primary" id="options">
+      <span class="btn-icon">⚙️</span>
+      Manage Snippets
+    </button>
+    
+    <div class="footer">
+      Press Tab to expand • v1.0
+    </div>
+  </div>
   
   <script src="popup.js"></script>
 </body>

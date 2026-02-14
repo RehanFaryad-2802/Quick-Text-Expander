@@ -1,4 +1,4 @@
-// ===== UNIVERSAL TEXT EXPANDER – WORKS ON WHATSAPP, DISCORD, YOUTUBE =====
+// ===== UNIVERSAL TEXT EXPANDER – OPTIMIZED FOR DISCORD & WHATSAPP =====
 let snippets = {};
 let triggerKey = 'Tab';
 let activeField = null;
@@ -108,6 +108,7 @@ function checkForShortcut(field) {
   const text = getFieldText(field);
   if (!text) return hideSuggestion();
 
+  // Only consider the last word
   const words = text.split(/\s+/);
   const lastWord = words[words.length - 1];
 
@@ -160,7 +161,7 @@ function hideSuggestion() {
   activeShortcut = '';
 }
 
-// ===== EXPANSION THAT WORKS ON WHATSAPP & DISCORD =====
+// ===== EXPANSION THAT WORKS ON DISCORD AND WHATSAPP =====
 function expandShortcut(field, shortcut) {
   const snippet = snippets[shortcut];
   if (!snippet) return;
@@ -176,57 +177,64 @@ function expandShortcut(field, shortcut) {
     field.value = newText;
     field.dispatchEvent(new Event('input', { bubbles: true }));
     field.selectionStart = field.selectionEnd = newText.length;
-    // Visual feedback
-    field.style.backgroundColor = '#e6f3e6';
-    setTimeout(() => field.style.backgroundColor = '', 200);
+    applyVisualFeedback(field);
     return;
   }
 
-  // For contenteditable – find the exact text node containing the shortcut
+  // For contenteditable – we need to be very careful with Discord and WhatsApp
+  // First, get the full text and ensure the shortcut is at the end (last word)
   const fullText = field.innerText || field.textContent;
-  const lastIndex = fullText.lastIndexOf(shortcut);
-  if (lastIndex === -1) return;
-
-  // Use TreeWalker to find the text node at the given character index
-  let startNode = null;
-  let startOffset = 0;
-  const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  let accumulated = 0;
-  while (node = walker.nextNode()) {
-    const len = node.textContent.length;
-    if (lastIndex >= accumulated && lastIndex < accumulated + len) {
-      startNode = node;
-      startOffset = lastIndex - accumulated;
-      break;
-    }
-    accumulated += len;
+  const lastWord = fullText.split(/\s+/).pop();
+  if (lastWord !== shortcut) {
+    console.warn('Shortcut not at end, aborting');
+    return;
   }
 
-  if (!startNode) return;
+  // Find the last text node and its position
+  const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  let textNodes = [];
+  while (node = walker.nextNode()) textNodes.push(node);
 
-  // Create a range that selects the shortcut
+  // We need the last text node that contains non‑whitespace at the end
+  // But Discord and WhatsApp often have the entire text in one node, so we can simply take the last node
+  const lastTextNode = textNodes[textNodes.length - 1];
+  if (!lastTextNode) return;
+
+  const nodeText = lastTextNode.textContent;
+  const shortcutIndex = nodeText.lastIndexOf(shortcut);
+  if (shortcutIndex === -1) return;
+
+  // Create a range that selects the shortcut within that node
   const range = document.createRange();
-  range.setStart(startNode, startOffset);
-  range.setEnd(startNode, startOffset + shortcut.length);
+  range.setStart(lastTextNode, shortcutIndex);
+  range.setEnd(lastTextNode, shortcutIndex + shortcut.length);
 
   // Select the range
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
 
-  // Delete the selected text and insert the snippet
+  // For Discord, sometimes we need to delete then insert
   document.execCommand('delete', false);
   document.execCommand('insertText', false, snippet);
 
-  // Move cursor to the end of inserted text
-  const newRange = document.createRange();
-  newRange.selectNodeContents(field);
-  newRange.collapse(false);
-  sel.removeAllRanges();
-  sel.addRange(newRange);
+  // For WhatsApp (Lexical), we also need to ensure the editor updates
+  // A small delay and refocus helps sometimes
+  setTimeout(() => {
+    field.focus();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(field);
+    newRange.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }, 10);
 
-  // Visual feedback
+  applyVisualFeedback(field);
+}
+
+function applyVisualFeedback(field) {
   field.style.backgroundColor = '#e6f3e6';
+  field.style.transition = 'background-color 0.2s';
   setTimeout(() => field.style.backgroundColor = '', 200);
 }

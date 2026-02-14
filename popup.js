@@ -5,17 +5,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const div = document.getElementById('snippets');
     
     if (Object.keys(snippets).length === 0) {
-      div.innerHTML = '<div class="empty">No snippets yet</div>';
+      div.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🌙</div>
+          <div class="empty-state-text">No snippets yet</div>
+          <div class="empty-state-hint">Click settings to add your first snippet</div>
+        </div>
+      `;
       return;
     }
     
     let html = '';
     for (const [shortcut, text] of Object.entries(snippets)) {
-      const preview = text.length > 30 ? text.substring(0, 30) + '...' : text;
+      const preview = text.length > 50 ? text.substring(0, 50) + '...' : text;
       html += `
-        <div class="snippet">
-          <div class="shortcut">${shortcut}</div>
-          <div class="preview">${preview}</div>
+        <div class="snippet-card">
+          <div class="shortcut-badge">${shortcut}</div>
+          <div class="preview-text">${preview}</div>
         </div>
       `;
     }
