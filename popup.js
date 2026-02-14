@@ -1,30 +1,29 @@
 document.addEventListener('DOMContentLoaded', function() {
-  loadSnippets();
-  
-  document.getElementById('optionsBtn').addEventListener('click', function() {
-    chrome.runtime.openOptionsPage();
-  });
-});
-
-function loadSnippets() {
+  // Load and display snippets
   chrome.storage.sync.get(['snippets'], function(result) {
     const snippets = result.snippets || {};
-    const listDiv = document.getElementById('snippetList');
+    const div = document.getElementById('snippets');
     
     if (Object.keys(snippets).length === 0) {
-      listDiv.innerHTML = '<p style="color: #666;">No snippets yet. Add some in options!</p>';
+      div.innerHTML = '<div class="empty">No snippets yet</div>';
       return;
     }
     
     let html = '';
     for (const [shortcut, text] of Object.entries(snippets)) {
+      const preview = text.length > 30 ? text.substring(0, 30) + '...' : text;
       html += `
-        <div class="snippet-item">
+        <div class="snippet">
           <div class="shortcut">${shortcut}</div>
-          <div class="preview">${text.substring(0, 50)}${text.length > 50 ? '...' : ''}</div>
+          <div class="preview">${preview}</div>
         </div>
       `;
     }
-    listDiv.innerHTML = html;
+    div.innerHTML = html;
   });
-}
+
+  // Options button
+  document.getElementById('options').addEventListener('click', function() {
+    chrome.runtime.openOptionsPage();
+  });
+});

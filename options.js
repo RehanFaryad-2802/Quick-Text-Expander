@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
   loadSnippets();
   loadSettings();
   
-  document.getElementById('saveSnippet').addEventListener('click', saveSnippet);
+  document.getElementById('saveBtn').addEventListener('click', saveSnippet);
   document.getElementById('triggerKey').addEventListener('change', saveTriggerKey);
 });
 
@@ -45,45 +45,51 @@ function saveSnippet() {
     snippets[shortcut] = text;
     
     chrome.storage.sync.set({ snippets: snippets }, function() {
-      // Clear form
       document.getElementById('shortcut').value = ';';
       document.getElementById('snippetText').value = '';
-      
-      // Reload snippets list
       loadSnippets();
     });
   });
 }
 
 function displaySnippets(snippets) {
-  const container = document.getElementById('snippetsContainer');
+  const container = document.getElementById('snippetsList');
   
   if (Object.keys(snippets).length === 0) {
-    container.innerHTML = '<p>No snippets yet. Add your first one above!</p>';
+    container.innerHTML = '<p>No snippets yet. Add one above!</p>';
     return;
   }
   
   let html = '';
   for (const [shortcut, text] of Object.entries(snippets)) {
     html += `
-      <div class="snippet-card">
+      <div class="snippet-card" data-shortcut="${shortcut}">
         <div class="snippet-shortcut">${shortcut}</div>
         <div class="snippet-text">${text}</div>
         <div class="snippet-actions">
-          <button class="btn btn-danger" onclick="deleteSnippet('${shortcut}')">Delete</button>
+          <button class="delete">Delete</button>
         </div>
       </div>
     `;
   }
+  
   container.innerHTML = html;
+  
+  // Add delete listeners
+  document.querySelectorAll('.delete').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const card = this.closest('.snippet-card');
+      const shortcut = card.dataset.shortcut;
+      deleteSnippet(shortcut);
+    });
+  });
 }
 
 function deleteSnippet(shortcut) {
-  if (confirm(`Delete snippet ${shortcut}?`)) {
+  if (confirm(`Delete ${shortcut}?`)) {
     chrome.storage.sync.get(['snippets'], function(result) {
       const snippets = result.snippets || {};
       delete snippets[shortcut];
-      
       chrome.storage.sync.set({ snippets: snippets }, function() {
         loadSnippets();
       });
