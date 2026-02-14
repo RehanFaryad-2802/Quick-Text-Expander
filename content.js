@@ -1,4 +1,4 @@
-// ===== ULTIMATE TEXT EXPANDER – FIXED FOR WHATSAPP & DISCORD =====
+// ===== UNIVERSAL TEXT EXPANDER – WORKS ON WHATSAPP, DISCORD, YOUTUBE =====
 let snippets = {};
 let triggerKey = 'Tab';
 let activeField = null;
@@ -26,23 +26,17 @@ function findEditableFields() {
     'input:not([type])', 'textarea',
     '[contenteditable="true"]', '[contenteditable=""]',
     '[role="textbox"]', '[role="combobox"]', '[role="searchbox"]',
-    '.editable', '.text-input',
     '.public-DraftEditor-content', // WhatsApp, LinkedIn
-    '[data-lexical-editor]', // Facebook
-    '[data-slate-editor]',
+    '[data-lexical-editor]', // WhatsApp, Facebook
+    '[data-slate-editor]', // Discord
     '[g_editable="true"]', // Gmail
-    'div[aria-multiline="true"]', 'div[contenteditable]',
     '[data-tab="10"]', // WhatsApp
     '.copyable-text.selectable-text', // WhatsApp
-    'div[spellcheck="true"]', 'div[aria-placeholder]',
-    'div[data-testid="conversation-compose-message-input"]', // WhatsApp
-    'div[title*="Type a message"]', 'div[aria-label*="Type a message"]',
-    'div[placeholder*="Type a message"]',
-    '#contenteditable-root', // YouTube comments
-    '#textarea', // YouTube search
+    'div[aria-label*="Type a message"]', // WhatsApp
+    '#contenteditable-root', // YouTube
     'yt-formatted-string[contenteditable="true"]', // YouTube
     'div[role="textbox"][contenteditable="true"]', // Discord
-    'div[data-slate-node="value"]', // Discord (new)
+    'div[data-slate-node="value"]', // Discord
   ];
   selectors.forEach(selector => {
     try { document.querySelectorAll(selector).forEach(el => fields.add(el)); } catch (e) {}
@@ -51,17 +45,13 @@ function findEditableFields() {
   return Array.from(fields);
 }
 
-// Attach listeners to all fields
+// Attach event listeners to all fields
 function attachToFields() {
   findEditableFields().forEach(field => {
     if (!field.hasAttribute('data-te-bound')) {
       field.setAttribute('data-te-bound', 'true');
       field.addEventListener('input', onInput);
       field.addEventListener('keydown', onKeyDown);
-      if (field.isContentEditable || field.getAttribute('contenteditable')) {
-        const observer = new MutationObserver(() => checkForShortcut(field));
-        observer.observe(field, { childList: true, characterData: true, subtree: true });
-      }
     }
   });
 }
@@ -170,13 +160,15 @@ function hideSuggestion() {
   activeShortcut = '';
 }
 
-// ===== ROBUST EXPANSION FOR CONTENTEDITABLE FIELDS =====
+// ===== EXPANSION THAT WORKS ON WHATSAPP & DISCORD =====
 function expandShortcut(field, shortcut) {
   const snippet = snippets[shortcut];
   if (!snippet) return;
 
+  field.focus();
+
+  // For input/textarea – simple
   if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
-    // Simple input/textarea
     const text = field.value;
     const lastIndex = text.lastIndexOf(shortcut);
     if (lastIndex === -1) return;
@@ -184,62 +176,55 @@ function expandShortcut(field, shortcut) {
     field.value = newText;
     field.dispatchEvent(new Event('input', { bubbles: true }));
     field.selectionStart = field.selectionEnd = newText.length;
-  } else {
-    // Contenteditable: find the exact text node and replace
-    field.focus();
-    const fullText = field.innerText || field.textContent;
-    const lastIndex = fullText.lastIndexOf(shortcut);
-    if (lastIndex === -1) return;
-
-    // Walk through text nodes to locate the exact position
-    const range = document.createRange();
-    let currentNode = field;
-    let accumulated = 0;
-    let found = false;
-
-    function findTextNode(node) {
-      if (found) return;
-      if (node.nodeType === Node.TEXT_NODE) {
-        const len = node.textContent.length;
-        const start = accumulated;
-        const end = accumulated + len;
-        if (lastIndex >= start && lastIndex < end) {
-          // The shortcut starts inside this text node
-          const offsetInNode = lastIndex - start;
-          range.setStart(node, offsetInNode);
-          range.setEnd(node, offsetInNode + shortcut.length);
-          found = true;
-        }
-        accumulated += len;
-      } else {
-        for (let child of node.childNodes) {
-          findTextNode(child);
-          if (found) break;
-        }
-      }
-    }
-
-    findTextNode(field);
-
-    if (found) {
-      // Select the exact shortcut and replace
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.execCommand('insertText', false, snippet);
-    } else {
-      // Fallback: replace using innerText (less reliable)
-      field.innerText = fullText.substring(0, lastIndex) + snippet + fullText.substring(lastIndex + shortcut.length);
-    }
-
-    // Move cursor to end
-    const newRange = document.createRange();
-    newRange.selectNodeContents(field);
-    newRange.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(newRange);
+    // Visual feedback
+    field.style.backgroundColor = '#e6f3e6';
+    setTimeout(() => field.style.backgroundColor = '', 200);
+    return;
   }
+
+  // For contenteditable – find the exact text node containing the shortcut
+  const fullText = field.innerText || field.textContent;
+  const lastIndex = fullText.lastIndexOf(shortcut);
+  if (lastIndex === -1) return;
+
+  // Use TreeWalker to find the text node at the given character index
+  let startNode = null;
+  let startOffset = 0;
+  const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  let accumulated = 0;
+  while (node = walker.nextNode()) {
+    const len = node.textContent.length;
+    if (lastIndex >= accumulated && lastIndex < accumulated + len) {
+      startNode = node;
+      startOffset = lastIndex - accumulated;
+      break;
+    }
+    accumulated += len;
+  }
+
+  if (!startNode) return;
+
+  // Create a range that selects the shortcut
+  const range = document.createRange();
+  range.setStart(startNode, startOffset);
+  range.setEnd(startNode, startOffset + shortcut.length);
+
+  // Select the range
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // Delete the selected text and insert the snippet
+  document.execCommand('delete', false);
+  document.execCommand('insertText', false, snippet);
+
+  // Move cursor to the end of inserted text
+  const newRange = document.createRange();
+  newRange.selectNodeContents(field);
+  newRange.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(newRange);
 
   // Visual feedback
   field.style.backgroundColor = '#e6f3e6';
