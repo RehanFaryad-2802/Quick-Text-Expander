@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Quick Text Expander",
-  "version": "1.0",
-  "description": "Expand shortcuts into full text snippets",
+  "name": "Quick Text Expander Pro",
+  "version": "2.1",
+  "description": "Expand shortcuts with variables, categories, search, and smart suggestions",
 
-  "permissions": ["storage"],
+  "permissions": ["storage", "clipboardRead", "clipboardWrite"],
   "host_permissions": ["<all_urls>"],
 
   "icons": {
@@ -19,6 +19,16 @@
       "16": "icon16.png",
       "48": "icon48.png",
       "128": "icon128.png"
+    }
+  },
+
+  "commands": {
+    "open-options": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Open Quick Text Expander settings"
     }
   },
 
